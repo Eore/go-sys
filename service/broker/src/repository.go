@@ -3,11 +3,25 @@ package broker
 import (
 	"errors"
 	"fmt"
-	"log"
 )
 
+type newMap struct {
+	domain string `json:"domain,omitempty"`
+	ip     string `json:"ip,omitempty"`
+}
+
+func (p *Pool) ListClient() []newMap {
+	var ret []newMap
+	for _, el := range p.Clients {
+		ret = append(ret, newMap{
+			domain: el.Domain,
+			ip:     el.IP,
+		})
+	}
+	return ret
+}
+
 func (p *Pool) AddClient(c Client) (*Pool, error) {
-	log.Printf("Adding %+v", c)
 	for _, el := range p.Clients {
 		if el.Domain == c.Domain {
 			msg := fmt.Sprintf("%s exist\n", c.Domain)
@@ -18,14 +32,14 @@ func (p *Pool) AddClient(c Client) (*Pool, error) {
 	return p, nil
 }
 
-func (p *Pool) RemoveClient(domain string) (*Pool, error) {
+func (p *Pool) RemoveClient(IP string) (*Pool, error) {
 	for i, el := range p.Clients {
-		if el.Domain == domain {
+		if el.IP == IP {
 			p.Clients = append(p.Clients[:i], p.Clients[i+1:]...)
 			return p, nil
 		}
 	}
-	msg := fmt.Sprintf("%s not exist\n", domain)
+	msg := fmt.Sprintf("%s not exist\n", IP)
 	return nil, errors.New(msg)
 }
 

@@ -1,14 +1,15 @@
 package broker
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 
 	"github.com/gorilla/websocket"
 )
 
-var m Message
-var p Pool
+var message Message
+var pool Pool
 
 func WSHandler(w http.ResponseWriter, r *http.Request) {
 	upgrader := websocket.Upgrader{
@@ -25,22 +26,39 @@ func WSHandler(w http.ResponseWriter, r *http.Request) {
 
 	go func(conn *websocket.Conn) {
 		for {
-			err := conn.ReadJSON(&m)
+			err := conn.ReadJSON(&message)
+			IP := conn.RemoteAddr().String()
 			if err != nil {
-				log.Printf("%s disconnect", conn.RemoteAddr())
+				log.Printf("%s disconnect", IP)
+				log.Printf("Remove %+v from list", IP)
+				pool.RemoveClient(IP)
 				conn.Close()
 				return
 			}
-			switch m.Action {
+			switch message.Action {
+			case "list":
+				conn.WriteJSON(pool.ListClient())
+				fmt.Println(pool.ListClient())
 			case "join":
-				p.AddClient(Client{
-					Domain:     m.Domain,
+				client := Client{
+					Domain:     message.Domain,
+					IP:         IP,
 					Connection: conn,
-				})
-				log.Printf("%s joined\n", m.Domain)
+				}
+				log.Printf("Adding %+v to list", client)
+				_, err := pool.AddClient(client)
+				if err != nil {
+					log.Printf("%s already joined\n", client.Domain)
+				} else {
+					pool.SendMessage(Message{
+						Type:   "response",
+						Status: SUCCESS,
+					})
+					log.Printf("%s joined\n", message.Domain)
+				}
 			default:
-				log.Printf("Sending to: %+v\n", m)
-				p.SendMessage(m)
+				log.Printf("Sending to: %+v\n", message)
+				pool.SendMessage(message)
 			}
 		}
 	}(conn)
